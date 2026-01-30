@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 from datetime import datetime, timezone
 from pydantic import BaseModel
 import random
+import os
+import requests
 
 app = FastAPI(title="Edge Portal")
 
@@ -33,9 +35,26 @@ def set_power_state(powerOn: bool = Query(...)):
     # TODO: Replace with real hardware control
     return PowerStateResponse(powerOn=powerOn)
 
+TEMP_DAEMON_URL = os.getenv("TEMP_DAEMON_URL", "http://localhost:7070")
+
 @app.get("/temperature", response_model=TempResponse)
 def get_temperature():
-    # TODO: Replace with real sensor read
-    value_c = round(20.0 + random.random() * 5.0, 2)
-    ts = datetime.now(timezone.utc).isoformat()
-    return TempResponse(value_c=value_c, timestamp=ts)
+    try:
+        r = requests.get(f"{TEMP_DAEMON_URL}/read", timeout=1.5)
+        r.raise_for_status()
+        data = r.json()
+
+        if data.get("status") != "ok":
+            raise HTTPException(status_code=502, detail=f"Daemon error: {data.get('error', 'unknown')}")
+
+        temp_c = data.get("temp_c")
+        if temp_c is None:
+            raise HTTPException(status_code=502, detail="Daemon response missing temp_c")
+
+        ts = data.get("timestamp") or datetime.now(timezone.utc).isoformat()
+        return TempResponse(value_c=round(float(temp_c), 2), timestamp=ts)
+
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Temperature daemon unavailable: {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=f"Bad daemon response: {e}")
