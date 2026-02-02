@@ -1,22 +1,52 @@
 services:
   aht30-daemon:
-    image: ghcr.io/carlosotero01/aht30-daemon:${VERSION:-latest}
+    image: ghcr.io/YOUR_GITHUB_USERNAME/aht30-daemon:${VERSION:-latest}
     container_name: aht30-daemon
     restart: unless-stopped
     devices:
       - "/dev/i2c-1:/dev/i2c-1"
     profiles: ["prod"]
 
+  # -------------------------
+  # NEW: video daemon (prod)
+  # -------------------------
+  video-daemon:
+    image: ghcr.io/YOUR_GITHUB_USERNAME/video-daemon:${VERSION:-latest}
+    container_name: video-daemon
+    restart: unless-stopped
+
+    # Lab-friendly camera access (tighten later if you want)
+    privileged: true
+    volumes:
+      - /run/udev:/run/udev:ro
+
+    environment:
+      - VIDEO_PORT=8080
+      - VIDEO_WIDTH=640
+      - VIDEO_HEIGHT=480
+      - VIDEO_FPS=30
+
+      # Optional but recommended for your upside-down mount
+      - RPICAM_JPEG_FLAGS=--vflip --hflip
+      - RPICAM_VID_FLAGS=--vflip --hflip
+
+    profiles: ["prod"]
+
   edge-portal:
-    image: ghcr.io/carlosotero01/edge-portal:${VERSION:-latest}
+    image: ghcr.io/YOUR_GITHUB_USERNAME/edge-portal:${VERSION:-latest}
     container_name: edge-portal
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
       - TEMP_DAEMON_URL=http://aht30-daemon:7070
+
+      # NEW: FastAPI talks to video-daemon by service name
+      - VIDEO_DAEMON_URL=http://video-daemon:8080
+
     depends_on:
       - aht30-daemon
+      - video-daemon
     profiles: ["prod"]
 
   aht30-daemon-dev:
@@ -44,6 +74,43 @@ services:
       - "8001:8000"
     environment:
       - TEMP_DAEMON_URL=http://aht30-daemon:7070
+
+      # NEW: in dev we still use the stable name "video-daemon"
+      - VIDEO_DAEMON_URL=http://video-daemon:8080
+
     depends_on:
       - aht30-daemon-dev
+      - video-daemon-dev
     profiles: ["dev"]
+
+  # -------------------------
+  # NEW: video daemon (dev)
+  # Aliased as "video-daemon"
+  # -------------------------
+  video-daemon-dev:
+    build:
+      context: .
+      dockerfile: daemons/video/Dockerfile
+    container_name: video-daemon-dev
+    restart: unless-stopped
+
+    privileged: true
+    volumes:
+      - /run/udev:/run/udev:ro
+
+    environment:
+      - VIDEO_PORT=8080
+      - VIDEO_WIDTH=640
+      - VIDEO_HEIGHT=480
+      - VIDEO_FPS=30
+
+      # Optional but recommended for your upside-down mount
+      - RPICAM_JPEG_FLAGS=--vflip --hflip
+      - RPICAM_VID_FLAGS=--vflip --hflip
+
+    profiles: ["dev"]
+    networks:
+      default:
+        aliases:
+          - video-daemon
+
