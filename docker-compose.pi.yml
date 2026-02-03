@@ -1,6 +1,6 @@
 services:
   aht30-daemon:
-    image: ghcr.io/YOUR_GITHUB_USERNAME/aht30-daemon:${VERSION:-latest}
+    image: ghcr.io/carlosotero01/aht30-daemon:${VERSION:-latest}
     container_name: aht30-daemon
     restart: unless-stopped
     devices:
@@ -11,7 +11,7 @@ services:
   # NEW: video daemon (prod)
   # -------------------------
   video-daemon:
-    image: ghcr.io/YOUR_GITHUB_USERNAME/video-daemon:${VERSION:-latest}
+    image: ghcr.io/carlosotero01/video-daemon:${VERSION:-latest}
     container_name: video-daemon
     restart: unless-stopped
 
@@ -33,7 +33,7 @@ services:
     profiles: ["prod"]
 
   edge-portal:
-    image: ghcr.io/YOUR_GITHUB_USERNAME/edge-portal:${VERSION:-latest}
+    image: ghcr.io/carlosotero01/edge-portal:${VERSION:-latest}
     container_name: edge-portal
     restart: unless-stopped
     ports:
